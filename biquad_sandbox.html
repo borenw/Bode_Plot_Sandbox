@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biquad Filter Sandbox</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --panel: #111318;
+    --border: #1e2330;
+    --accent: #00e5ff;
+    --accent2: #76ff03;
+    --pole: #ff3d71;
+    --zero: #00e5ff;
+    --grid: #1a1f2e;
+    --text: #c8d0e0;
+    --muted: #4a5568;
+    --label: #7a8499;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 240px 1fr 1fr;
+    grid-template-rows: 44px 36px 1fr 1fr;
+    gap: 1px;
+    background-color: #05060a;
+  }
+
+  header {
+    grid-column: 1 / -1;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 16px;
+  }
+  header h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .badge {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  .header-status {
+    margin-left: auto;
+    display: flex;
+    gap: 18px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .sv { color: var(--accent2); }
+
+  /* ── HTTP Bar ── */
+  .httpbar {
+    grid-column: 1 / -1;
+    background: #0d1017;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+  }
+  .httpbar .method {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 2px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+    opacity: 0.85;
+  }
+  .httpbar .url-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .httpbar .url-input:focus { border-color: var(--accent); }
+  .httpbar .url-input::placeholder { color: var(--muted); }
+  .httpbar .fetch-btn {
+    padding: 4px 14px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .httpbar .fetch-btn:hover { background: rgba(0,229,255,0.08); }
+  .httpbar .fetch-btn:active { background: rgba(0,229,255,0.16); }
+  .httpbar .fetch-btn.loading { opacity: 0.5; cursor: wait; }
+  .httpbar .save-btn {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .httpbar .save-btn:hover { background: rgba(118,255,3,0.08); }
+  .http-status {
+    font-size: 9px;
+    white-space: nowrap;
+    min-width: 120px;
+    text-align: right;
+  }
+  .http-status.ok  { color: var(--accent2); }
+  .http-status.err { color: var(--pole); }
+  .http-status.info{ color: var(--label); }
+  .fmt-hint {
+    font-size: 8px;
+    color: var(--muted);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Left Panel ── */
+  .left {
+    grid-row: 3 / -1;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+  }
+  .sec {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--label);
+    text-transform: uppercase;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--border);
+  }
+  .crow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .crow label { width: 26px; font-size: 11px; color: var(--label); }
+  .crow input[type=range] {
+    width: 70px; flex: none; -webkit-appearance: none;
+    height: 2px; background: var(--border); border-radius: 1px; outline: none;
+  }
+  .crow input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+    box-shadow: 0 0 5px var(--accent);
+  }
+  .b-grp input[type=range]::-webkit-slider-thumb {
+    background: var(--accent2);
+    box-shadow: 0 0 5px var(--accent2);
+  }
+  .crow .ni {
+    width: 58px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 3px 5px;
+    border-radius: 2px;
+    text-align: right;
+  }
+  .crow .ni:focus { outline: none; border-color: var(--accent); }
+  .frac2 {
+    font-size: 9px;
+    color: #4a9a7a;
+    white-space: nowrap;
+    width: 48px;
+    text-align: left;
+    letter-spacing: 0.3px;
+    font-family: 'JetBrains Mono', monospace;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #2a3a40;
+    outline: none;
+    padding: 1px 2px;
+    cursor: text;
+  }
+  .frac2:focus { border-bottom-color: #4a9a7a; color: #76ffb0; }
+
+  .btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
+  .btn {
+    flex: 1;
+    padding: 5px 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--label);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .drag-pal { display: flex; gap: 8px; }
+  .di {
+    flex: 1; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--border);
+    border-radius: 3px; cursor: grab;
+    font-size: 18px; font-weight: 700;
+    transition: all 0.15s; user-select: none;
+  }
+  .di.pd { color: var(--pole); border-color: var(--pole); }
+  .di.zd { color: var(--zero); border-color: var(--zero); }
+  .di:hover { background: rgba(255,255,255,0.04); transform: scale(1.04); }
+  .di:active { cursor: grabbing; }
+  .hint { font-size: 8px; color: var(--muted); line-height: 1.7; }
+
+  /* ── Panels ── */
+  .zpanel, .fpanel, .eqpanel, .diapanel {
+    background: var(--panel);
+    position: relative;
+    overflow: hidden;
+  }
+  .zpanel  { border-right: 1px solid var(--border); grid-column: 2; grid-row: 3; }
+  .zpanel canvas { cursor: pointer; }
+  .fpanel  { border-bottom: 1px solid var(--border); grid-column: 2; grid-row: 4; }
+  .eqpanel { border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); grid-column: 3; grid-row: 3; }
+  .diapanel{ border-left: 1px solid var(--border); grid-column: 3; grid-row: 4; }
+
+  .plbl {
+    position: absolute; top: 10px; left: 13px;
+    font-size: 8px; letter-spacing: 3px;
+    color: var(--label); text-transform: uppercase;
+    z-index: 10; pointer-events: none;
+  }
+
+  canvas { width: 100%; height: 100%; display: block; }
+
+  /* Equation panel */
+  .eqpanel {
+    display: flex; flex-direction: column;
+    padding: 14px 16px; gap: 6px;
+  }
+  .eq-body {
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center; gap: 14px;
+  }
+  .hz-lbl { font-size: 11px; color: var(--label); letter-spacing: 2px; }
+  .frac { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 100%; }
+  .frac-num { font-size: 11px; color: var(--accent2); padding: 3px 8px; letter-spacing: 0.5px; text-align: center; }
+  .frac-den { font-size: 11px; color: var(--accent);  padding: 3px 8px; letter-spacing: 0.5px; text-align: center; }
+  .frac-line { width: 90%; height: 1px; background: var(--muted); }
+  /* term spans inside frac-num / frac-den */
+  .term-zero { color: #2e3a46; }   /* grey out zero-valued terms */
+  .pzlist { font-size: 11px; color: var(--muted); line-height: 2.1; width:100%; text-align:center; }
+  .pe { color: var(--pole); }
+  .ze { color: var(--zero); }
+  /* ── Save Dialog ── */
+  .dialog-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .dialog-overlay.open { display: flex; }
+  .dialog {
+    background: #111520;
+    border: 1px solid var(--accent2);
+    border-radius: 4px;
+    width: 520px; max-width: 94vw;
+    box-shadow: 0 0 40px rgba(118,255,3,0.12);
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .dialog-hdr {
+    background: #0d1017;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .dialog-hdr span { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; color:var(--accent2); letter-spacing:2px; }
+  .dialog-hdr .close-btn {
+    margin-left:auto; background:none; border:none; color:var(--muted);
+    font-size:16px; cursor:pointer; line-height:1; padding:2px 6px;
+  }
+  .dialog-hdr .close-btn:hover { color:var(--pole); }
+  .dialog-body { padding: 14px 16px; display:flex; flex-direction:column; gap:12px; }
+  .dialog-tabs { display:flex; gap:4px; }
+  .dtab {
+    padding:4px 12px; font-size:9px; letter-spacing:2px; text-transform:uppercase;
+    background:transparent; border:1px solid var(--border); color:var(--muted);
+    cursor:pointer; border-radius:2px; font-family:'JetBrains Mono',monospace;
+  }
+  .dtab.active { border-color:var(--accent2); color:var(--accent2); background:rgba(118,255,3,0.06); }
+  .dialog-code {
+    background: #080a0e;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    font-size: 11px;
+    color: #a8c0d0;
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 280px;
+    overflow-y: auto;
+    line-height: 1.6;
+  }
+  .dialog-code .key   { color: #4a90d9; }
+  .dialog-code .val   { color: var(--accent2); }
+  .dialog-code .str   { color: #e8a060; }
+  .dialog-code .cmt   { color: #3a4a5a; }
+  .dialog-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+    background: #0d1017;
+  }
+  .dialog-footer .btn { flex:0; padding:5px 16px; }
+  .copy-ok { font-size:9px; color:var(--accent2); align-self:center; opacity:0; transition:opacity 0.3s; }
+  .copy-ok.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Biquad Filter</h1>
+  <span class="badge">IIR · 2nd ORDER · Z-DOMAIN</span>
+  <div class="header-status">
+    <span>POLES <span class="sv" id="pCnt">2</span></span>
+    <span>ZEROS <span class="sv" id="zCnt">2</span></span>
+    <span>STABLE <span class="sv" id="stab">YES</span></span>
+  </div>
+</header>
+
+<!-- HTTP Fetch Bar -->
+<div class="httpbar">
+  <span class="method">GET</span>
+  <input class="url-input" id="urlInput" type="text"
+    placeholder="https://borenw.github.io/Biquad_Sandbox/?b0=1&b1=0&b2=0&a1=-0.9375&a2=0"
+    value="https://borenw.github.io/Biquad_Sandbox/?b0=1&b1=0&b2=0&a1=-0.9375&a2=0"
+    onkeydown="if(event.key==='Enter')fetchCoeffs()">
+  <span class="fmt-hint">JSON: {b0,b1,b2,a1,a2}</span>
+  <button class="fetch-btn" id="fetchBtn" onclick="fetchCoeffs()">FETCH</button>
+  <button class="fetch-btn save-btn" id="saveBtn" onclick="saveCoeffs()">COPY URL</button>
+  <span class="http-status info" id="httpStatus">ready</span>
+</div>
+
+<!-- Left: coefficients -->
+<div class="left">
+  <div class="sec">Numerator (B)</div>
+  <div class="b-grp" id="bGrp" style="display:flex;flex-direction:column;gap:9px"></div>
+
+  <div class="sec">Denominator (A)</div>
+  <div class="a-grp" id="aGrp" style="display:flex;flex-direction:column;gap:9px"></div>
+
+  <div class="sec">Presets</div>
+  <div class="btn-row">
+    <button class="btn" onclick="preset('li')">Leaky Int</button>
+    <button class="btn" onclick="preset('rst')">Reset</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="preset('lp')">Lowpass</button>
+    <button class="btn" onclick="preset('hp')">Highpass</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="preset('bp')">Bandpass</button>
+    <button class="btn" onclick="preset('notch')">Notch</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="preset('ap')">Allpass</button>
+  </div>
+
+  <div class="sec">Drag to Z-Plane</div>
+  <div class="drag-pal">
+    <div class="di pd" draggable="true" ondragstart="pdrag(event,'pole')">✕<br><span style="font-size:8px;font-weight:400;opacity:.7">POLE</span></div>
+    <div class="di zd" draggable="true" ondragstart="pdrag(event,'zero')">○<br><span style="font-size:8px;font-weight:400;opacity:.7">ZERO</span></div>
+  </div>
+  <div class="hint">Drag ✕/○ onto z-plane. Right-click a marker to delete. Dragging updates all coefficients.</div>
+</div>
+
+<!-- Z-Plane -->
+<div class="zpanel" id="zpw">
+  <div class="plbl">Z — PLANE</div>
+  <canvas id="zc"></canvas>
+</div>
+
+<!-- Frequency Response -->
+<div class="fpanel" id="fpw">
+  <div class="plbl" style="display:flex;align-items:center;gap:10px;pointer-events:auto">
+    <span>FREQUENCY RESPONSE  |H(e<sup style="font-size:6px">jω</sup>)|</span>
+    <span style="margin-left:8px;font-size:8px;color:var(--label);letter-spacing:1px">Fs=</span>
+    <input id="fsInput" type="text" value="1000000"
+      style="width:72px;background:#0a0d12;border:1px solid #2a3a50;color:#a0c8d8;
+             font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 5px;
+             border-radius:2px;outline:none;letter-spacing:0.5px"
+      title="Sample rate in Hz (e.g. 1000000 = 1MHz)"
+      onchange="all()" onkeydown="if(event.key==='Enter')all()">
+    <span style="font-size:8px;color:var(--label)">Hz</span>
+  </div>
+  <canvas id="fc"></canvas>
+</div>
+
+<!-- Transfer Function -->
+<div class="eqpanel">
+  <div class="plbl" style="position:relative;top:0;left:0;margin-bottom:2px">TRANSFER FUNCTION</div>
+  <div class="eq-body">
+    <div class="hz-lbl">H(z) =</div>
+    <div class="frac">
+      <div class="frac-num" id="numS">b₀ + b₁z⁻¹ + b₂z⁻²</div>
+      <div class="frac-line"></div>
+      <div class="frac-den" id="denS">1 + a₁z⁻¹ + a₂z⁻²</div>
+    </div>
+  </div>
+  <div style="height:1px;background:var(--border);margin:4px 0"></div>
+  <div class="pzlist" id="pzl"></div>
+</div>
+
+<!-- Signal Flow Diagram -->
+<div class="diapanel" id="dpw">
+  <div class="plbl">SIGNAL FLOW · DIRECT FORM II</div>
+  <canvas id="dc"></canvas>
+</div>
+
+<script>
+// ── State ──
+let C = { b0:1, b1:0, b2:0, a1:-0.9375, a2:0 };
+let poles=[], zeros=[];
+let palType=null, drag=null;
+
+// ── Coefficient defs ──
+const bDefs=[{id:'b0',lbl:'b₀'},{id:'b1',lbl:'b₁'},{id:'b2',lbl:'b₂'}];
+const aDefs=[{id:'a1',lbl:'a₁'},{id:'a2',lbl:'a₂'}];
+
+// ── Power-of-2 fraction display ──
+// Finds nearest n/2^p with p up to 8 (denominator up to 256)
+function toFrac2(v){
+  if(Math.abs(v) < 1e-6) return '0';
+  const sign = v < 0 ? '-' : '';
+  const av = Math.abs(v);
+  let bestNum=1, bestDen=1, bestErr=Infinity;
+  for(let p=0; p<=8; p++){
+    const den = 1 << p;           // 1,2,4,8,...,256
+    const num = Math.round(av * den);
+    if(num === 0) continue;
+    const err = Math.abs(av - num/den);
+    if(err < bestErr){ bestErr=err; bestNum=num; bestDen=den; }
+    if(err < 1e-6) break;         // exact — stop early
+  }
+  // Simplify: divide by GCD
+  function gcd(a,b){ return b===0?a:gcd(b,a%b); }
+  const g = gcd(bestNum, bestDen);
+  const n = bestNum/g, d = bestDen/g;
+  if(d === 1) return `${sign}${n}`;
+  return `${sign}${n}/${d}`;
+}
+
+function updateFracs(){
+  ['b0','b1','b2','a1','a2'].forEach(id=>{
+    const el=document.getElementById(`fr_${id}`);
+    if(el && document.activeElement!==el) el.value = toFrac2(C[id]??0);
+  });
+}
+
+function parseFrac(str){
+  // Accepts: "15/16", "-3/4", "0.75", "1", "-1/2" etc.
+  str = str.trim();
+  const m = str.match(/^(-?\d+)\s*\/\s*(\d+)$/);
+  if(m) return parseInt(m[1])/parseInt(m[2]);
+  const n = parseFloat(str);
+  return isNaN(n) ? null : n;
+}
+
+function buildUI(){
+  function row(def,grpId){
+    const d=document.createElement('div');
+    d.className='crow';
+    d.innerHTML=`<label>${def.lbl}</label>
+      <input type="range" id="sl_${def.id}" min="-2" max="2" step="0.001" value="${C[def.id]??0}">
+      <input type="text" class="ni" id="ni_${def.id}" value="${(C[def.id]??0).toFixed(3)}">
+      <input type="text" class="frac2" id="fr_${def.id}" value="${toFrac2(C[def.id]??0)}" title="Enter fraction e.g. 15/16">`;
+    document.getElementById(grpId).appendChild(d);
+    const sl=d.querySelector(`#sl_${def.id}`);
+    const ni=d.querySelector(`#ni_${def.id}`);
+    const fr=d.querySelector(`#fr_${def.id}`);
+
+    const apply=v=>{ C[def.id]=v; sync(); all(); updateFracs(); };
+
+    sl.oninput=()=>{ const v=parseFloat(sl.value); ni.value=v.toFixed(3); apply(v); };
+    ni.onchange=()=>{ let v=Math.max(-2,Math.min(2,parseFloat(ni.value)||0)); ni.value=v.toFixed(3); sl.value=v; apply(v); };
+    fr.onchange=()=>{
+      const v=parseFrac(fr.value);
+      if(v===null){ fr.value=toFrac2(C[def.id]??0); return; }
+      const clamped=Math.max(-2,Math.min(2,v));
+      ni.value=clamped.toFixed(3); sl.value=clamped; apply(clamped);
+    };
+    fr.onkeydown=e=>{ if(e.key==='Enter'){ fr.blur(); } };
+  }
+  bDefs.forEach(d=>row(d,'bGrp'));
+  aDefs.forEach(d=>row(d,'aGrp'));
+}
+
+function setUI(){
+  ['b0','b1','b2','a1','a2'].forEach(id=>{
+    const v=C[id]??0;
+    const sl=document.getElementById(`sl_${id}`),ni=document.getElementById(`ni_${id}`);
+    if(sl){sl.value=v;ni.value=v.toFixed(4);}
+  });
+  updateFracs();
+}
+
+// ── Presets ──
+const PRE={
+  li: {b0:1,  b1:0,     b2:0,    a1:-0.9375, a2:0},
+  lp: {b0:0.292,b1:0.585,b2:0.292,a1:-0.169,a2:0.176},
+  hp: {b0:0.745,b1:-1.490,b2:0.745,a1:-0.942,a2:0.333},
+  bp: {b0:0.145,b1:0,b2:-0.145,a1:-1.507,a2:0.710},
+  notch:{b0:0.872,b1:-1.390,b2:0.872,a1:-1.390,a2:0.745},
+  ap: {b0:0.333,b1:-0.942,b2:1,a1:-0.942,a2:0.333},
+  rst:{b0:1,b1:0,b2:0,a1:0,a2:0},
+};
+function preset(k){ Object.assign(C,PRE[k]); setUI(); sync(); all(); }
+
+// ── Coeff ↔ PZ ──
+function sync(){
+  // Poles: z² + a1*z + a2 = 0
+  const dp=C.a1*C.a1-4*C.a2;
+  poles=[];
+  if(dp>=0){const q=Math.sqrt(dp);poles.push({re:(-C.a1+q)/2,im:0},{re:(-C.a1-q)/2,im:0});}
+  else{const q=Math.sqrt(-dp);poles.push({re:-C.a1/2,im:q/2},{re:-C.a1/2,im:-q/2});}
+  // Zeros: b0*z² + b1*z + b2 = 0
+  zeros=[];
+  const b0=Math.abs(C.b0)<1e-9?1:C.b0;
+  const dz=C.b1*C.b1-4*b0*C.b2;
+  if(dz>=0){const q=Math.sqrt(dz);zeros.push({re:(-C.b1+q)/(2*b0),im:0},{re:(-C.b1-q)/(2*b0),im:0});}
+  else{const q=Math.sqrt(-dz);zeros.push({re:-C.b1/(2*b0),im:q/(2*b0)},{re:-C.b1/(2*b0),im:-q/(2*b0)});}
+}
+
+function pzToCoeffs(){
+  if(poles.length>=2){
+    C.a1=-(poles[0].re+poles[1].re);
+    C.a2=poles[0].re*poles[1].re-poles[0].im*poles[1].im;
+  }
+  if(zeros.length>=2){
+    C.b0=1;
+    C.b1=-(zeros[0].re+zeros[1].re);
+    C.b2=zeros[0].re*zeros[1].re-zeros[0].im*zeros[1].im;
+  }
+  setUI();
+}
+
+// ── Z-Plane ──
+const zc=document.getElementById('zc'), zctx=zc.getContext('2d');
+const zpw=document.getElementById('zpw');
+
+function sz(){ zc.width=zpw.clientWidth; zc.height=zpw.clientHeight; }
+
+function toC(re,im){
+  const cx=zc.width/2,cy=zc.height/2,sc=Math.min(cx,cy)*0.72;
+  return{x:cx+re*sc,y:cy-im*sc};
+}
+function fromC(x,y){
+  const cx=zc.width/2,cy=zc.height/2,sc=Math.min(cx,cy)*0.72;
+  return{re:(x-cx)/sc,im:-(y-cy)/sc};
+}
+
+function drawZ(){
+  const W=zc.width,H=zc.height,cx=W/2,cy=H/2,sc=Math.min(cx,cy)*0.72;
+  zctx.clearRect(0,0,W,H);
+
+  // grid
+  zctx.strokeStyle='#10131a';zctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=24){zctx.beginPath();zctx.moveTo(x,0);zctx.lineTo(x,H);zctx.stroke();}
+  for(let y=0;y<H;y+=24){zctx.beginPath();zctx.moveTo(0,y);zctx.lineTo(W,y);zctx.stroke();}
+
+  // axes
+  zctx.strokeStyle='#222a3a';zctx.lineWidth=1;
+  zctx.beginPath();zctx.moveTo(0,cy);zctx.lineTo(W,cy);zctx.stroke();
+  zctx.beginPath();zctx.moveTo(cx,0);zctx.lineTo(cx,H);zctx.stroke();
+
+  // unit circle
+  zctx.strokeStyle='rgba(0,229,255,0.22)';zctx.lineWidth=1.5;zctx.setLineDash([4,4]);
+  zctx.beginPath();zctx.arc(cx,cy,sc,0,Math.PI*2);zctx.stroke();
+  zctx.setLineDash([]);
+
+  // labels
+  zctx.fillStyle='#2e3a50';zctx.font='10px JetBrains Mono';
+  zctx.fillText('1',cx+sc+4,cy-4);
+  zctx.fillText('-1',cx-sc-22,cy-4);
+  zctx.fillText('j',cx+4,cy-sc-5);
+  zctx.fillText('-j',cx+4,cy+sc+13);
+  zctx.fillStyle='#3a4a60';zctx.font='9px JetBrains Mono';
+  zctx.fillText('z-plane',W-60,20);
+
+  // stable ROC shading
+  const stable=poles.every(p=>Math.hypot(p.re,p.im)<1);
+  if(stable){
+    const g=zctx.createRadialGradient(cx,cy,0,cx,cy,sc);
+    g.addColorStop(0,'rgba(0,229,255,0.04)');g.addColorStop(1,'rgba(0,229,255,0)');
+    zctx.fillStyle=g;zctx.beginPath();zctx.arc(cx,cy,sc,0,Math.PI*2);zctx.fill();
+  }
+
+  // zeros (○)
+  zeros.forEach(z=>{
+    const p=toC(z.re,z.im);
+    zctx.strokeStyle='#00e5ff';zctx.lineWidth=2;
+    zctx.shadowColor='#00e5ff';zctx.shadowBlur=8;
+    zctx.beginPath();zctx.arc(p.x,p.y,7,0,Math.PI*2);zctx.stroke();
+    zctx.shadowBlur=0;
+  });
+
+  // poles (✕)
+  poles.forEach(pl=>{
+    const p=toC(pl.re,pl.im);
+    zctx.strokeStyle='#ff3d71';zctx.lineWidth=2.5;
+    zctx.shadowColor='#ff3d71';zctx.shadowBlur=10;
+    zctx.beginPath();
+    zctx.moveTo(p.x-7,p.y-7);zctx.lineTo(p.x+7,p.y+7);
+    zctx.moveTo(p.x+7,p.y-7);zctx.lineTo(p.x-7,p.y+7);
+    zctx.stroke();zctx.shadowBlur=0;
+  });
+
+  // status
+  document.getElementById('pCnt').textContent=poles.length;
+  document.getElementById('zCnt').textContent=zeros.length;
+  const s=document.getElementById('stab');
+  s.textContent=stable?'YES':'NO';
+  s.style.color=stable?'var(--accent2)':'var(--pole)';
+  updateEq();
+}
+
+// mouse drag on z-plane
+zc.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  const r=zc.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(zc.width/r.width);
+  const y=(e.clientY-r.top)*(zc.height/r.height);
+  for(let i=0;i<poles.length;i++){
+    const p=toC(poles[i].re,poles[i].im);
+    if(Math.hypot(p.x-x,p.y-y)<13){drag={t:'pole',i};return;}
+  }
+  for(let i=0;i<zeros.length;i++){
+    const p=toC(zeros[i].re,zeros[i].im);
+    if(Math.hypot(p.x-x,p.y-y)<13){drag={t:'zero',i};return;}
+  }
+});
+// ── Z-plane cursor ──
+zc.addEventListener('mousemove',e=>{
+  const r=zc.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(zc.width/r.width);
+  const y=(e.clientY-r.top)*(zc.height/r.height);
+
+  // drag logic — move only the grabbed marker
+  if(drag){
+    zc.style.cursor='grabbing';
+    const z=fromC(x,y);
+    if(drag.t==='pole'){
+      poles[drag.i]={re:z.re,im:z.im};
+    } else {
+      zeros[drag.i]={re:z.re,im:z.im};
+    }
+    pzToCoeffs();all();
+    return;
+  }
+
+  // hover cursor
+  const near=[...poles,...zeros].some(p=>{
+    const q=toC(p.re,p.im);
+    return Math.hypot(q.x-x,q.y-y)<14;
+  });
+  zc.style.cursor = near ? 'grab' : 'pointer';
+});
+zc.addEventListener('mouseup',()=>{ drag=null; zc.style.cursor='pointer'; });
+zc.addEventListener('mouseleave',()=>{ drag=null; zc.style.cursor='pointer'; });
+zc.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const r=zc.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(zc.width/r.width);
+  const y=(e.clientY-r.top)*(zc.height/r.height);
+  let best=14,bt=null,bi=-1;
+  poles.forEach((p,i)=>{const q=toC(p.re,p.im),d=Math.hypot(q.x-x,q.y-y);if(d<best){best=d;bt='pole';bi=i;}});
+  zeros.forEach((z,i)=>{const q=toC(z.re,z.im),d=Math.hypot(q.x-x,q.y-y);if(d<best){best=d;bt='zero';bi=i;}});
+  if(bt==='pole')poles.splice(bi,1);
+  if(bt==='zero')zeros.splice(bi,1);
+  pzToCoeffs();all();
+});
+
+// palette drag
+function pdrag(e,t){palType=t;e.dataTransfer.setData('text/plain',t);}
+zc.addEventListener('dragover',e=>e.preventDefault());
+zc.addEventListener('drop',e=>{
+  e.preventDefault();
+  const t=palType||e.dataTransfer.getData('text/plain');
+  const r=zc.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(zc.width/r.width);
+  const y=(e.clientY-r.top)*(zc.height/r.height);
+  const z=fromC(x,y);
+  if(t==='pole')poles=[{re:z.re,im:z.im},{re:z.re,im:-z.im}];
+  else zeros=[{re:z.re,im:z.im},{re:z.re,im:-z.im}];
+  pzToCoeffs();all();palType=null;
+});
+
+// ── Frequency Response ──
+const fc_el=document.getElementById('fc'),fctx=fc_el.getContext('2d');
+const fpw=document.getElementById('fpw');
+function sf(){fc_el.width=fpw.clientWidth;fc_el.height=fpw.clientHeight;}
+
+function H(w){
+  const{b0,b1,b2,a1,a2}=C;
+  const c1=Math.cos(w),s1=Math.sin(w),c2=Math.cos(2*w),s2=Math.sin(2*w);
+  const nr=b0+b1*c1+b2*c2,ni=-b1*s1-b2*s2;
+  const dr=1+a1*c1+a2*c2,di=-a1*s1-a2*s2;
+  const dm=dr*dr+di*di;
+  if(dm<1e-12)return 0;
+  const rr=(nr*dr+ni*di)/dm,ri=(ni*dr-nr*di)/dm;
+  return Math.sqrt(rr*rr+ri*ri);
+}
+
+function drawF(){
+  const W=fc_el.width,Ht=fc_el.height;
+  fctx.clearRect(0,0,W,Ht);
+
+  // Get Fs
+  const Fs = Math.max(1, parseFloat(document.getElementById('fsInput').value)||1e6);
+
+  const pL=52, pR=10, pT=30, pB=52; // extra bottom for dual x-axis
+  const pw=W-pL-pR, ph=Ht-pT-pB;
+
+  fctx.fillStyle='#0d1017'; fctx.fillRect(pL,pT,pw,ph);
+
+  // Log freq axis: ω from wMin to π
+  const wMin=0.005, wMax=Math.PI;
+  const logMin=Math.log10(wMin), logMax=Math.log10(wMax);
+  function freqToX(w){ return pL + pw*(Math.log10(w)-logMin)/(logMax-logMin); }
+
+  // dB axis
+  const dbMin=-60, dbMax=30;
+  function dbToY(db){ return pT + ph*(1-(db-dbMin)/(dbMax-dbMin)); }
+  function magToDb(m){ return 20*Math.log10(Math.max(m,1e-6)); }
+
+  // Vertical grid lines
+  const freqTicks=[0.01,0.02,0.05,0.1,0.2,0.5,1,2,Math.PI];
+  fctx.strokeStyle='#1a2030'; fctx.lineWidth=0.6;
+  freqTicks.forEach(w=>{
+    if(w<wMin||w>wMax) return;
+    const x=freqToX(w);
+    fctx.beginPath(); fctx.moveTo(x,pT); fctx.lineTo(x,pT+ph); fctx.stroke();
+  });
+
+  // Horizontal dB grid lines
+  [-60,-40,-20,0,20].forEach(db=>{
+    const y=dbToY(db);
+    fctx.strokeStyle = db===0 ? '#2a4060' : '#1a2030';
+    fctx.lineWidth   = db===0 ? 1.2 : 0.6;
+    fctx.beginPath(); fctx.moveTo(pL,y); fctx.lineTo(pL+pw,y); fctx.stroke();
+  });
+
+  // Curve
+  const N=512, pts=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const w=Math.pow(10,logMin+t*(logMax-logMin));
+    const db=magToDb(H(w));
+    pts.push({ x:freqToX(w), y:dbToY(Math.max(dbMin,Math.min(dbMax,db))) });
+  }
+
+  // Fill
+  const g=fctx.createLinearGradient(0,pT,0,pT+ph);
+  g.addColorStop(0,'rgba(0,229,255,0.18)'); g.addColorStop(1,'rgba(0,229,255,0.01)');
+  fctx.fillStyle=g; fctx.beginPath();
+  fctx.moveTo(pts[0].x, pT+ph);
+  pts.forEach(p=>fctx.lineTo(p.x, Math.min(p.y,pT+ph)));
+  fctx.lineTo(pts[N].x, pT+ph);
+  fctx.closePath(); fctx.fill();
+
+  // Line
+  fctx.strokeStyle='#00e5ff'; fctx.lineWidth=1.8;
+  fctx.shadowColor='#00e5ff'; fctx.shadowBlur=5;
+  fctx.beginPath();
+  pts.forEach((p,i)=>{
+    const cy=Math.max(pT,Math.min(pT+ph,p.y));
+    i===0 ? fctx.moveTo(p.x,cy) : fctx.lineTo(p.x,cy);
+  });
+  fctx.stroke(); fctx.shadowBlur=0;
+  fctx.strokeStyle='#2a3a50'; fctx.lineWidth=1; fctx.strokeRect(pL,pT,pw,ph);
+
+  // ── Y axis: dB labels ──
+  fctx.textAlign='right'; fctx.font='11px JetBrains Mono';
+  [-60,-40,-20,0,20].forEach(db=>{
+    fctx.fillStyle = db===0 ? '#6ab0e0' : '#8aaabb';
+    fctx.fillText(`${db}`, pL-5, dbToY(db)+4);
+  });
+  // dB rotated label
+  fctx.save();
+  fctx.translate(12, pT+ph/2); fctx.rotate(-Math.PI/2);
+  fctx.fillStyle='#7a9aaa'; fctx.font='11px JetBrains Mono'; fctx.textAlign='center';
+  fctx.fillText('dB', 0, 0);
+  fctx.restore();
+
+  // ── X axis row 1: ω (rad/sample) ──
+  const xTicks=[[0.01,'0.01'],[0.05,'0.05'],[0.1,'0.1'],[0.5,'0.5'],[1,'1'],[Math.PI,'π']];
+  fctx.font='11px JetBrains Mono'; fctx.textAlign='center';
+  xTicks.forEach(([w,l])=>{
+    if(w<wMin) return;
+    fctx.fillStyle='#8aaabb';
+    fctx.fillText(l, freqToX(w), pT+ph+14);
+  });
+  // ω label
+  fctx.fillStyle='#5a7a8a'; fctx.font='10px JetBrains Mono';
+  fctx.fillText('ω (rad)', pL-28, pT+ph+14);
+
+  // ── X axis row 2: Hz (derived from Fs) ──
+  // ω = 2π·f/Fs  →  f = ω·Fs/(2π)
+  // Map the same log-spaced ticks to Hz
+  function omegaToHz(w){ return w*Fs/(2*Math.PI); }
+
+  // Build nice Hz tick labels at the same x positions
+  function fmtHz(f){
+    if(f>=1e6)  return (f/1e6).toPrecision(3)+'M';
+    if(f>=1e3)  return (f/1e3).toPrecision(3)+'k';
+    return f.toPrecision(3)+'';
+  }
+
+  fctx.font='10px JetBrains Mono'; fctx.textAlign='center';
+  xTicks.forEach(([w,])=>{
+    if(w<wMin) return;
+    const hz=omegaToHz(w);
+    fctx.fillStyle='#6a90a0';
+    fctx.fillText(fmtHz(hz), freqToX(w), pT+ph+30);
+  });
+  // Hz label
+  fctx.fillStyle='#4a6a7a'; fctx.font='10px JetBrains Mono';
+  fctx.fillText('Hz', pL-28, pT+ph+30);
+
+  // Separator tick marks between the two axis rows
+  fctx.strokeStyle='#2a3a4a'; fctx.lineWidth=0.5;
+  xTicks.forEach(([w,])=>{
+    if(w<wMin) return;
+    const x=freqToX(w);
+    fctx.beginPath(); fctx.moveTo(x,pT+ph); fctx.lineTo(x,pT+ph+4); fctx.stroke();
+  });
+}
+
+// ── Frequency cursor state ──
+let freqCursor = null; // { omega, x (canvas px) } or null
+
+// Draw cursor overlay on freq panel (called after drawF)
+function drawFreqCursor(){
+  if(!freqCursor) return;
+  const W=fc_el.width, Ht=fc_el.height;
+  const Fs=Math.max(1,parseFloat(document.getElementById('fsInput').value)||1e6);
+  const pL=52,pR=10,pT=30,pB=52;
+  const pw=W-pL-pR,ph=Ht-pT-pB;
+  const wMin=0.005,wMax=Math.PI;
+  const logMin=Math.log10(wMin),logMax=Math.log10(wMax);
+  const dbMin=-60,dbMax=30;
+  function dbToY(db){return pT+ph*(1-(db-dbMin)/(dbMax-dbMin));}
+  function magToDb(m){return 20*Math.log10(Math.max(m,1e-6));}
+  function fmtHz(f){
+    if(f>=1e6) return (f/1e6).toFixed(3)+'M';
+    if(f>=1e3) return (f/1e3).toFixed(2)+'k';
+    return f.toFixed(1)+'';
+  }
+
+  const {omega, x} = freqCursor;
+  const mag = H(omega);
+  const db  = magToDb(mag);
+  const hz  = omega*Fs/(2*Math.PI);
+  const cy  = dbToY(Math.max(dbMin,Math.min(dbMax,db)));
+
+  // Vertical cursor line
+  fctx.save();
+  fctx.strokeStyle='rgba(255,255,255,0.35)';
+  fctx.lineWidth=1;
+  fctx.setLineDash([4,3]);
+  fctx.beginPath(); fctx.moveTo(x,pT); fctx.lineTo(x,pT+ph); fctx.stroke();
+  fctx.setLineDash([]);
+
+  // Dot on curve
+  fctx.fillStyle='#ffffff';
+  fctx.beginPath(); fctx.arc(x, Math.max(pT,Math.min(pT+ph,cy)), 3.5, 0, Math.PI*2); fctx.fill();
+
+  // Label box — position left or right depending on space
+  const onRight = x < pL+pw*0.65;
+  const lx = onRight ? x+8 : x-8;
+  const dbStr  = `${db>=0?'+':''}${db.toFixed(1)} dB`;
+  const omStr  = `ω=${omega.toFixed(3)}`;
+  const hzStr  = `${fmtHz(hz)} Hz`;
+  fctx.font='bold 11px JetBrains Mono';
+  const maxW = Math.max(
+    fctx.measureText(dbStr).width,
+    fctx.measureText(omStr).width,
+    fctx.measureText(hzStr).width
+  ) + 12;
+  const boxX = onRight ? lx : lx - maxW;
+  const boxY = Math.max(pT+4, Math.min(pT+ph-52, cy-28));
+
+  fctx.fillStyle='rgba(8,14,22,0.88)';
+  fctx.strokeStyle='rgba(0,229,255,0.5)';
+  fctx.lineWidth=1;
+  const rr=3;
+  fctx.beginPath();
+  fctx.roundRect(boxX,boxY,maxW,50,rr);
+  fctx.fill(); fctx.stroke();
+
+  fctx.textAlign='left';
+  fctx.fillStyle='#00e5ff'; fctx.font='bold 11px JetBrains Mono';
+  fctx.fillText(dbStr, boxX+6, boxY+14);
+  fctx.fillStyle='#8aaabb'; fctx.font='10px JetBrains Mono';
+  fctx.fillText(omStr,  boxX+6, boxY+28);
+  fctx.fillStyle='#6a90a0';
+  fctx.fillText(hzStr,  boxX+6, boxY+41);
+
+  fctx.restore();
+}
+
+// Draw z-plane cursor overlay (angle line + pole/zero distance lines)
+function drawZCursor(){
+  if(!freqCursor) return;
+  const {omega} = freqCursor;
+  const W=zc.width, H=zc.height;
+  const cx=W/2, cy=H/2, sc=Math.min(cx,cy)*0.72;
+
+  // Point on unit circle at angle omega (DTFT: z = e^jω)
+  const ux = cx + sc*Math.cos(omega);
+  const uy = cy - sc*Math.sin(omega);
+
+  zctx.save();
+
+  // Line from origin to unit circle point
+  zctx.strokeStyle='rgba(255,255,255,0.5)';
+  zctx.lineWidth=1.2;
+  zctx.setLineDash([4,3]);
+  zctx.beginPath(); zctx.moveTo(cx,cy); zctx.lineTo(ux,uy); zctx.stroke();
+  zctx.setLineDash([]);
+
+  // Dot on unit circle
+  zctx.fillStyle='#ffffff';
+  zctx.beginPath(); zctx.arc(ux,uy,4,0,Math.PI*2); zctx.fill();
+
+  // Lines from each pole to the unit circle point
+  poles.forEach(p=>{
+    const pc=toC(p.re,p.im);
+    zctx.strokeStyle='rgba(255,61,113,0.7)';
+    zctx.lineWidth=1.2;
+    zctx.beginPath(); zctx.moveTo(pc.x,pc.y); zctx.lineTo(ux,uy); zctx.stroke();
+    // distance label
+    const dist=Math.hypot(p.re-Math.cos(omega), p.im-Math.sin(omega));
+    const mx=(pc.x+ux)/2, my=(pc.y+uy)/2;
+    zctx.fillStyle='rgba(255,61,113,0.9)'; zctx.font='9px JetBrains Mono';
+    zctx.textAlign='center'; zctx.textBaseline='middle';
+    zctx.fillText(dist.toFixed(2),mx,my-7);
+  });
+
+  // Lines from each zero to the unit circle point
+  zeros.forEach(z=>{
+    const zp=toC(z.re,z.im);
+    zctx.strokeStyle='rgba(0,229,255,0.7)';
+    zctx.lineWidth=1.2;
+    zctx.beginPath(); zctx.moveTo(zp.x,zp.y); zctx.lineTo(ux,uy); zctx.stroke();
+    const dist=Math.hypot(z.re-Math.cos(omega), z.im-Math.sin(omega));
+    const mx=(zp.x+ux)/2, my=(zp.y+uy)/2;
+    zctx.fillStyle='rgba(0,229,255,0.9)'; zctx.font='9px JetBrains Mono';
+    zctx.textAlign='center'; zctx.textBaseline='middle';
+    zctx.fillText(dist.toFixed(2),mx,my-7);
+  });
+
+  // Angle arc label
+  zctx.strokeStyle='rgba(255,255,255,0.2)';
+  zctx.lineWidth=1;
+  zctx.beginPath(); zctx.arc(cx,cy,sc*0.18,0,-omega,omega>0); zctx.stroke();
+  zctx.fillStyle='rgba(255,255,255,0.7)'; zctx.font='bold 10px JetBrains Mono';
+  zctx.textAlign='center'; zctx.textBaseline='middle';
+  const alx=cx+sc*0.26*Math.cos(omega/2);
+  const aly=cy-sc*0.26*Math.sin(omega/2);
+  zctx.fillText(`${(omega*180/Math.PI).toFixed(1)}°`, alx, aly);
+
+  zctx.restore();
+}
+
+// Freq panel mouse events
+fc_el.addEventListener('mousemove', e=>{
+  const r=fc_el.getBoundingClientRect();
+  const mx=(e.clientX-r.left)*(fc_el.width/r.width);
+  const my=(e.clientY-r.top)*(fc_el.height/r.height);
+  const pL=52,pR=10,pT=30,pB=52;
+  const pw=fc_el.width-pL-pR, ph=fc_el.height-pT-pB;
+  if(mx<pL||mx>pL+pw||my<pT||my>pT+ph){ freqCursor=null; all(); return; }
+  const wMin=0.005,wMax=Math.PI;
+  const logMin=Math.log10(wMin),logMax=Math.log10(wMax);
+  const t=(mx-pL)/pw;
+  const omega=Math.pow(10, logMin+t*(logMax-logMin));
+  freqCursor={ omega, x: mx };
+  // redraw base then overlays
+  drawF(); drawFreqCursor();
+  drawZ(); drawZCursor();
+});
+
+fc_el.addEventListener('mouseleave',()=>{
+  freqCursor=null;
+  drawF();
+  drawZ();
+});
+function updateEq(){
+  const{b0,b1,b2,a1,a2}=C;
+  const EPS=0.001;
+  const f=v=>v.toFixed(3);
+
+  // Helper: wrap a term in grey span if value is ~0
+  function term(val, suffix, baseCol){
+    const zero = Math.abs(val) < EPS;
+    const col = zero ? 'var(--muted)' : baseCol;
+    const opacity = zero ? '0.35' : '1';
+    return `<span style="color:${col};opacity:${opacity}">${f(val)}${suffix}</span>`;
+  }
+
+  // Numerator: b0 + b1*z^-1 + b2*z^-2
+  document.getElementById('numS').innerHTML =
+    term(b0,'','inherit') + '  +  ' +
+    term(b1,'z⁻¹','inherit') + '  +  ' +
+    term(b2,'z⁻²','inherit');
+
+  // Denominator: 1 + a1*z^-1 + a2*z^-2
+  document.getElementById('denS').innerHTML =
+    '<span>1</span>  +  ' +
+    term(a1,'z⁻¹','inherit') + '  +  ' +
+    term(a2,'z⁻²','inherit');
+
+  // Pole / zero list — larger font, below divider
+  let html='';
+  poles.forEach((p,i)=>{
+    const m=Math.hypot(p.re,p.im).toFixed(3);
+    const ang=(Math.atan2(p.im,p.re)*180/Math.PI).toFixed(1);
+    const re=p.re.toFixed(3), im=(p.im>=0?'+':'')+p.im.toFixed(3);
+    html+=`<div class="pe">✕ p${i+1}: ${re}${im}j &nbsp;|${m}|∠${ang}°</div>`;
+  });
+  zeros.forEach((z,i)=>{
+    const m=Math.hypot(z.re,z.im).toFixed(3);
+    const ang=(Math.atan2(z.im,z.re)*180/Math.PI).toFixed(1);
+    const re=z.re.toFixed(3), im=(z.im>=0?'+':'')+z.im.toFixed(3);
+    html+=`<div class="ze">○ z${i+1}: ${re}${im}j &nbsp;|${m}|∠${ang}°</div>`;
+  });
+  document.getElementById('pzl').innerHTML=html;
+}
+
+// ── Signal Flow Diagram ──
+const dc_el=document.getElementById('dc'),dctx=dc_el.getContext('2d');
+const dpw=document.getElementById('dpw');
+function sd(){dc_el.width=dpw.clientWidth;dc_el.height=dpw.clientHeight;}
+
+function drawD(){
+  const W=dc_el.width, H=dc_el.height;
+  dctx.clearRect(0,0,W,H);
+  const{b0,b1,b2,a1,a2}=C;
+  const EPS=0.001;
+
+  // ── Grid layout matching reference image ──
+  // Rows:    r0, r1, r2  (signal rows)
+  // Z⁻¹ boxes sit BELOW r0 and r1 (between rows), on left AND right buses
+  // Columns: xIN  xLBUS  xBTRI  xADD  xATRI  xRBUS  xOUT
+  //
+  // Signal flow:
+  //   x[n] → left bus (vertical) → b-triangles (→) → adders (+) → a-triangles (→) → y[n]
+  //   right bus tapped from y[n], goes down through Z⁻¹, feeds -a triangles (←) into adders
+  //   left bus goes down through Z⁻¹, feeds b-taps at r1, r2
+
+  const DW=340, DH=195;
+  const sc=Math.min(W/DW, H/DH)*0.92;
+  const ox=(W-DW*sc)/2, oy=(H-DH*sc)/2;
+  const s=v=>v*sc;
+  function px(x){return ox+s(x);}
+  function py(y){return oy+s(y);}
+
+  // Row y positions
+  const r0=10, r1=95, r2=180;
+  // Z⁻¹ box y positions (between rows)
+  const rz1=(r0+r1)/2, rz2=(r1+r2)/2;
+
+  // Column x positions — wider to fit triHW=27 on each side
+  const xIN=0, xLBUS=20, xBTRI=76, xADD=142, xATRI=206, xRBUS=268, xOUT=300;
+
+  // ── helpers ──
+  function wire(x1,y1,x2,y2,col='#2a3a50',lw=1){
+    dctx.strokeStyle=col; dctx.lineWidth=lw;
+    dctx.beginPath(); dctx.moveTo(px(x1),py(y1)); dctx.lineTo(px(x2),py(y2)); dctx.stroke();
+  }
+  function arw(x1,y1,x2,y2,col='#2a3a50'){
+    wire(x1,y1,x2,y2,col);
+    const ang=Math.atan2(py(y2)-py(y1),px(x2)-px(x1)), hl=s(5);
+    dctx.fillStyle=col; dctx.beginPath();
+    dctx.moveTo(px(x2),py(y2));
+    dctx.lineTo(px(x2)-hl*Math.cos(ang-0.4), py(y2)-hl*Math.sin(ang-0.4));
+    dctx.lineTo(px(x2)-hl*Math.cos(ang+0.4), py(y2)-hl*Math.sin(ang+0.4));
+    dctx.closePath(); dctx.fill();
+  }
+  function dot(x,y,col){
+    dctx.fillStyle=col; dctx.beginPath();
+    dctx.arc(px(x),py(y),s(3),0,Math.PI*2); dctx.fill();
+  }
+  function delay(x,y){
+    const bw=s(30), bh=s(20);
+    dctx.fillStyle='#0a1020'; dctx.strokeStyle='#4a90d9'; dctx.lineWidth=1.5;
+    dctx.fillRect(px(x)-bw/2, py(y)-bh/2, bw, bh);
+    dctx.strokeRect(px(x)-bw/2, py(y)-bh/2, bw, bh);
+    dctx.fillStyle='#4a90d9'; dctx.font=`bold ${s(9)}px JetBrains Mono`;
+    dctx.textAlign='center'; dctx.textBaseline='middle';
+    dctx.fillText('Z⁻¹', px(x), py(y));
+  }
+  function adder(x,y,col){
+    const r=s(11);
+    dctx.fillStyle='#0d1017'; dctx.strokeStyle=col; dctx.lineWidth=1.5;
+    dctx.beginPath(); dctx.arc(px(x),py(y),r,0,Math.PI*2); dctx.fill(); dctx.stroke();
+    dctx.fillStyle=col; dctx.font=`bold ${s(13)}px JetBrains Mono`;
+    dctx.textAlign='center'; dctx.textBaseline='middle';
+    dctx.fillText('+', px(x), py(y));
+  }
+  function tri(label, x, y, col, rtl, active){
+    const bw=s(54), bh=s(36);
+    const hw=bw/2, hh=bh/2;
+    const cx=px(x), cy=py(y);
+    dctx.fillStyle = active ? '#060d14' : '#080c10';
+    dctx.strokeStyle = active ? col : '#283038';
+    dctx.lineWidth = active ? 2.4 : 0.8;
+    if(!active) dctx.setLineDash([4,4]);
+    dctx.beginPath();
+    if(!rtl){
+      dctx.moveTo(cx-hw, cy-hh);
+      dctx.lineTo(cx+hw, cy);
+      dctx.lineTo(cx-hw, cy+hh);
+    } else {
+      dctx.moveTo(cx+hw, cy-hh);
+      dctx.lineTo(cx-hw, cy);
+      dctx.lineTo(cx+hw, cy+hh);
+    }
+    dctx.closePath(); dctx.fill(); dctx.stroke();
+    dctx.setLineDash([]);
+    dctx.fillStyle = active ? col : '#283038';
+    dctx.font = `${active?'bold ':' '}${s(active?9.5:7)}px JetBrains Mono`;
+    dctx.textAlign='center'; dctx.textBaseline='middle';
+    const nudge = rtl ? s(7) : -s(7);
+    dctx.fillText(label, cx+nudge, cy);
+  }
+  function lbl(t,x,y,col,sz){
+    dctx.fillStyle=col; dctx.font=`${s(sz)}px JetBrains Mono`;
+    dctx.textAlign='center'; dctx.textBaseline='middle';
+    dctx.fillText(t, px(x), py(y));
+  }
+
+  const triHW = 27; // design-unit half-width (54/2) for wire attachment
+
+  // ── x[n] label & arrow into left bus ──
+  lbl('x[n]', xIN, r0, '#c8d0e0', 9);
+  arw(xIN+9, r0, xLBUS, r0, '#4a5a6a');
+
+  const delHH=10, addR=11; // design-unit half-height of delay box, adder radius
+
+  // ── LEFT BUS ──
+  wire(xLBUS, r0, xLBUS, rz1-delHH, '#3a4a5a');
+  delay(xLBUS, rz1);
+  wire(xLBUS, rz1+delHH, xLBUS, rz2-delHH, '#3a4a5a');
+  delay(xLBUS, rz2);
+  wire(xLBUS, rz2+delHH, xLBUS, r2, '#3a4a5a');
+  dot(xLBUS, r0, '#3a4a5a');
+  dot(xLBUS, r1, '#3a4a5a');
+  dot(xLBUS, r2, '#3a4a5a');
+
+  // ── b GAINS ──
+  const bc0=Math.abs(b0)>EPS?'#76ff03':'#2a3040';
+  const bc1=Math.abs(b1)>EPS?'#76ff03':'#2a3040';
+  const bc2=Math.abs(b2)>EPS?'#76ff03':'#2a3040';
+
+  arw(xLBUS, r0, xBTRI-triHW, r0, bc0);
+  arw(xLBUS, r1, xBTRI-triHW, r1, bc1);
+  arw(xLBUS, r2, xBTRI-triHW, r2, bc2);
+
+  tri(`b₀=${b0.toFixed(2)}`, xBTRI, r0, '#76ff03', false, Math.abs(b0)>EPS);
+  tri(`b₁=${b1.toFixed(2)}`, xBTRI, r1, '#76ff03', false, Math.abs(b1)>EPS);
+  tri(`b₂=${b2.toFixed(2)}`, xBTRI, r2, '#76ff03', false, Math.abs(b2)>EPS);
+
+  arw(xBTRI+triHW, r0, xADD-addR, r0, bc0);
+  arw(xBTRI+triHW, r1, xADD-addR, r1, bc1);
+  arw(xBTRI+triHW, r2, xADD-addR, r2, bc2);
+
+  // ── ADDERS — lit if any input to that row is active ──
+  // r0: always has b0 path + accumulation from below → always cyan
+  // r1: active if b1≠0 OR a1≠0
+  // r2: active if b2≠0 OR a2≠0
+  const addCol1 = (Math.abs(b1)>EPS || Math.abs(a1)>EPS) ? '#00e5ff' : '#2a3040';
+  const addCol2 = (Math.abs(b2)>EPS || Math.abs(a2)>EPS) ? '#00e5ff' : '#2a3040';
+  adder(xADD, r0, '#00e5ff');
+  adder(xADD, r1, addCol1);
+  adder(xADD, r2, addCol2);
+  // vertical carry wires — lit if the source adder has signal
+  arw(xADD, r2, xADD, r1+addR, addCol2);
+  arw(xADD, r1, xADD, r0+addR, addCol1);
+
+  // ── a0 GAIN → y[n] ──
+  arw(xADD+addR, r0, xATRI-triHW, r0, '#00e5ff');
+  tri('a₀=1', xATRI, r0, '#00e5ff', false, true);
+  arw(xATRI+triHW, r0, xRBUS, r0, '#00e5ff');
+
+  // ── y[n] ──
+  arw(xRBUS, r0, xOUT, r0, '#00e5ff');
+  lbl('y[n]', xOUT+8, r0, '#c8d0e0', 9);
+
+  // ── RIGHT BUS ──
+  dot(xRBUS, r0, '#ff3d71');
+  wire(xRBUS, r0, xRBUS, rz1-delHH, '#3a4a5a');
+  delay(xRBUS, rz1);
+  wire(xRBUS, rz1+delHH, xRBUS, rz2-delHH, '#3a4a5a');
+  delay(xRBUS, rz2);
+  wire(xRBUS, rz2+delHH, xRBUS, r2, '#3a4a5a');
+  dot(xRBUS, r1, '#3a4a5a');
+  dot(xRBUS, r2, '#3a4a5a');
+
+  // ── -a GAINS ──
+  const na1=(-a1).toFixed(2), na2=(-a2).toFixed(2);
+  const ac1=Math.abs(a1)>EPS?'#ff3d71':'#2a3040';
+  const ac2=Math.abs(a2)>EPS?'#ff3d71':'#2a3040';
+
+  arw(xRBUS, r1, xATRI+triHW, r1, ac1);
+  arw(xRBUS, r2, xATRI+triHW, r2, ac2);
+
+  tri(`-a₁=${na1}`, xATRI, r1, '#ff3d71', true, Math.abs(a1)>EPS);
+  tri(`-a₂=${na2}`, xATRI, r2, '#ff3d71', true, Math.abs(a2)>EPS);
+
+  arw(xATRI-triHW, r1, xADD+addR, r1, ac1);
+  arw(xATRI-triHW, r2, xADD+addR, r2, ac2);
+}
+
+function openUrlParams(){
+  const url = document.getElementById('urlInput').value.trim();
+  if(!url){ document.getElementById('dlgStatus').textContent='⚠ No URL in bar.'; return; }
+  // If already has params, open as-is; otherwise build it
+  const full = url.includes('?') ? url : buildShareUrl();
+  window.open(full, '_blank');
+}
+
+// ── HTTP Fetch ──
+async function fetchCoeffs(){
+  const url = document.getElementById('urlInput').value.trim();
+  const btn = document.getElementById('fetchBtn');
+  const status = document.getElementById('httpStatus');
+
+  if(!url){ setStatus('enter a URL first','err'); return; }
+
+  btn.classList.add('loading'); btn.disabled=true;
+  setStatus('fetching…','info');
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      mode: 'cors',
+    });
+
+    if(!res.ok){ setStatus(`HTTP ${res.status} ${res.statusText}`,'err'); return; }
+
+    const raw = await res.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch(e){ setStatus('invalid JSON response','err'); return; }
+
+    // Accept flat {b0,b1,b2,a1,a2} or nested {coeffs:{...}} or array [b0,b1,b2,a1,a2]
+    const d = data.coeffs ?? data.filter ?? data.biquad ?? data;
+    if(Array.isArray(d) && d.length>=5){
+      C.b0=+d[0]; C.b1=+d[1]; C.b2=+d[2]; C.a1=+d[3]; C.a2=+d[4];
+    } else {
+      const pick = (keys, fallback) => {
+        for(const k of keys) if(d[k]!==undefined) return +d[k];
+        return fallback;
+      };
+      C.b0 = pick(['b0','B0','b_0','num0'],C.b0);
+      C.b1 = pick(['b1','B1','b_1','num1'],C.b1);
+      C.b2 = pick(['b2','B2','b_2','num2'],C.b2);
+      C.a1 = pick(['a1','A1','a_1','den1'],C.a1);
+      C.a2 = pick(['a2','A2','a_2','den2'],C.a2);
+    }
+
+    setUI(); sync(); all();
+    setStatus(`200 OK · b0=${C.b0.toFixed(3)}`, 'ok');
+
+  } catch(e) {
+    // CORS or network error
+    if(e.name==='TypeError'){
+      setStatus('network/CORS error','err');
+      showCorsHint();
+    } else {
+      setStatus(e.message.slice(0,40),'err');
+    }
+  } finally {
+    btn.classList.remove('loading'); btn.disabled=false;
+  }
+}
+
+function setStatus(msg,cls){
+  const el=document.getElementById('httpStatus');
+  el.textContent=msg; el.className=`http-status ${cls}`;
+}
+
+// ── Save Dialog state ──
+let _savePayload = null;
+let _saveTab = 'json';
+
+function buildPayload(){
+  return {
+    b0: C.b0, b1: C.b1, b2: C.b2,
+    a1: C.a1, a2: C.a2,
+    stable: poles.every(p=>Math.hypot(p.re,p.im)<1),
+    poles: poles.map(p=>({re:+p.re.toFixed(6),im:+p.im.toFixed(6)})),
+    zeros: zeros.map(z=>({re:+z.re.toFixed(6),im:+z.im.toFixed(6)})),
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function syntaxHL(json){
+  return json
+    .replace(/("[\w]+")\s*:/g,'<span class="key">$1</span>:')
+    .replace(/:\s*(-?[\d.]+)/g,(m,v)=>`: <span class="val">${v}</span>`)
+    .replace(/:\s*(true|false)/g,(m,v)=>`: <span class="val">${v}</span>`)
+    .replace(/:\s*(".*?")/g,(m,v)=>`: <span class="str">${v}</span>`);
+}
+
+function tabContent(tab, url, payload){
+  const j = JSON.stringify(payload, null, 2);
+  if(tab==='json') return syntaxHL(j);
+  if(tab==='curl') return [
+    `<span class="cmt"># Send biquad coefficients via POST</span>`,
+    `curl -X POST \\`,
+    `  -H <span class="str">"Content-Type: application/json"</span> \\`,
+    `  -d <span class="str">'${JSON.stringify(payload)}'</span> \\`,
+    `  <span class="str">"${url||'http://your-server/endpoint'}"</span>`,
+  ].join('\n');
+  if(tab==='python') return [
+    `<span class="cmt">import</span> requests`,
+    ``,
+    `payload = ${j.replace(/^/gm,'').slice(0,500)}`,
+    ``,
+    `r = requests.post(`,
+    `    <span class="str">"${url||'http://your-server/endpoint'}"</span>,`,
+    `    json=payload`,
+    `)`,
+    `print(r.status_code, r.text)`,
+  ].join('\n');
+  if(tab==='js') return [
+    `<span class="cmt">// Fetch API (browser or Node 18+)</span>`,
+    `const payload = ${j};`,
+    ``,
+    `const res = await fetch(<span class="str">"${url||'http://your-server/endpoint'}"</span>, {`,
+    `  method: <span class="str">"POST"</span>,`,
+    `  headers: { <span class="str">"Content-Type"</span>: <span class="str">"application/json"</span> },`,
+    `  body: JSON.stringify(payload),`,
+    `});`,
+    `const data = await res.json();`,
+    `console.log(data);`,
+  ].join('\n');
+  if(tab==='urlparams'){
+    const base = url || 'http://your-server/endpoint';
+    const qs = Object.entries(payload)
+      .filter(([k])=>['b0','b1','b2','a1','a2'].includes(k))
+      .map(([k,v])=>`${k}=${encodeURIComponent(v)}`)
+      .join('&');
+    const full = `${base}?${qs}`;
+    return [
+      `<span class="cmt">// ── URL Query String (GET) ──</span>`,
+      `<span class="cmt">// Works for simple servers / serverless functions.</span>`,
+      `<span class="cmt">// Coefficients are passed as plain URL parameters.</span>`,
+      ``,
+      `<span class="key">GET</span> ${full}`,
+      ``,
+      `<span class="cmt">// ── JavaScript: build & navigate ──</span>`,
+      `const p = ${JSON.stringify({b0:payload.b0,b1:payload.b1,b2:payload.b2,a1:payload.a1,a2:payload.a2},null,2)};`,
+      `const qs = new URLSearchParams(p).toString();`,
+      `const url = \`<span class="str">${base}?\${qs}</span>\`;`,
+      ``,
+      `<span class="cmt">// Option A: navigate (browser GET, no CORS issue)</span>`,
+      `window.location.href = url;`,
+      ``,
+      `<span class="cmt">// Option B: fetch GET (same CORS rules as POST apply)</span>`,
+      `const res = await fetch(url);`,
+      `const data = await res.json();`,
+      ``,
+      `<span class="cmt">// ── Server side (Node/Express) ──</span>`,
+      `app.get(<span class="str">'/endpoint'</span>, (req, res) => {`,
+      `  const {b0,b1,b2,a1,a2} = req.query; <span class="cmt">// all strings!</span>`,
+      `  const coeffs = Object.fromEntries(`,
+      `    Object.entries({b0,b1,b2,a1,a2}).map(([k,v])=>[k,parseFloat(v)])`,
+      `  );`,
+      `  res.json({ ok: true, received: coeffs });`,
+      `});`,
+      ``,
+      `<span class="cmt">// ── Limitation vs JSON POST ──</span>`,
+      `<span class="cmt">// ✓ Simple, no Content-Type header needed</span>`,
+      `<span class="cmt">// ✓ Works via plain &lt;a href&gt; or window.open</span>`,
+      `<span class="cmt">// ✗ Values come as strings — must parseFloat() on server</span>`,
+      `<span class="cmt">// ✗ URL length limit ~2000 chars (fine for 5 coefficients)</span>`,
+      `<span class="cmt">// ✗ Coefficients visible in server logs & browser history</span>`,
+    ].join('\n');
+  }
+  return j;
+}
+
+function showTab(tab, el){
+  _saveTab = tab;
+  document.querySelectorAll('.dtab').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const url = document.getElementById('urlInput').value.trim();
+  document.getElementById('dlgCode').innerHTML = tabContent(tab, url, _savePayload);
+}
+
+function closeDialog(){
+  document.getElementById('saveDialog').classList.remove('open');
+}
+
+async function copyDlg(){
+  const text = document.getElementById('dlgCode').innerText;
+  try {
+    await navigator.clipboard.writeText(text);
+    const ok=document.getElementById('copyOk');
+    ok.classList.add('show');
+    setTimeout(()=>ok.classList.remove('show'),2000);
+  } catch(_){}
+}
+
+async function doPost(){
+  const url = document.getElementById('urlInput').value.trim();
+  if(!url){ document.getElementById('dlgStatus').textContent='⚠ No URL entered.'; return; }
+  document.getElementById('dlgStatus').textContent='Posting…';
+  try {
+    const res = await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      mode:'cors',
+      body: JSON.stringify(_savePayload,null,2),
+    });
+    if(res.ok){
+      setStatus(`SAVED ${res.status} · ${new Date().toLocaleTimeString()}`,'ok');
+      document.getElementById('dlgStatus').textContent=`✓ Server responded ${res.status}`;
+    } else {
+      document.getElementById('dlgStatus').textContent=`✕ Server returned HTTP ${res.status}`;
+      setStatus(`Save failed: HTTP ${res.status}`,'err');
+    }
+  } catch(e){
+    document.getElementById('dlgStatus').textContent=`✕ ${e.name==='TypeError'?'Network/CORS error':e.message}`;
+    setStatus('POST failed','err');
+  }
+}
+
+// ── Build shareable URL with current coefficients as query params ──
+function buildShareUrl(){
+  const rawUrl = document.getElementById('urlInput').value.trim();
+  // Strip any existing query string to get the base URL
+  const base = rawUrl ? rawUrl.split('?')[0] : window.location.href.split('?')[0];
+  const {b0,b1,b2,a1,a2} = C;
+  const qs = new URLSearchParams({
+    b0: b0.toFixed(4),
+    b1: b1.toFixed(4),
+    b2: b2.toFixed(4),
+    a1: a1.toFixed(4),
+    a2: a2.toFixed(4),
+  }).toString();
+  return `${base}?${qs}`;
+}
+
+// ── Copy URL to Share ──
+async function saveCoeffs(){
+  _savePayload = buildPayload();
+
+  // Build the full shareable URL and update the input bar
+  const shareUrl = buildShareUrl();
+  document.getElementById('urlInput').value = shareUrl;
+
+  // Copy to clipboard immediately
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    setStatus('URL copied to clipboard ✓', 'ok');
+  } catch(_){
+    setStatus('URL updated in bar', 'info');
+  }
+
+  // Also open the dialog showing the URL + other formats
+  _saveTab = 'urlparams';
+  document.querySelectorAll('.dtab').forEach((b,i)=>b.classList.toggle('active',i===4));
+  document.getElementById('dlgUrl').textContent = '';
+  document.getElementById('dlgCode').innerHTML = tabContent('urlparams', shareUrl.split('?')[0], _savePayload);
+  document.getElementById('dlgStatus').textContent = 'URL copied to clipboard and updated in bar above.';
+  document.getElementById('saveDialog').classList.add('open');
+}
+function showCorsHint(){
+  const st=document.getElementById('httpStatus');
+  st.title='Server must send Access-Control-Allow-Origin: * header. Or use a local server on the same origin.';
+}
+
+// ── Master redraw ──
+function all(){
+  drawZ(); if(freqCursor) drawZCursor();
+  drawF(); if(freqCursor) drawFreqCursor();
+  drawD();
+}
+
+// ── Resize ──
+function raz(){sz();sf();sd();all();}
+new ResizeObserver(raz).observe(document.body);
+
+// ── On load: read coefficients from URL query params ──
+function loadFromUrl(){
+  const p = new URLSearchParams(window.location.search);
+  const keys = ['b0','b1','b2','a1','a2'];
+  let found = false;
+  keys.forEach(k=>{ if(p.has(k)){ C[k]=parseFloat(p.get(k)); found=true; } });
+  if(found){ setUI(); setStatus('loaded from URL params','ok'); }
+}
+
+// ── Init ──
+buildUI();
+loadFromUrl();
+sync();
+raz();
+</script>
+<!-- Save Dialog -->
+<div class="dialog-overlay" id="saveDialog" onclick="if(event.target===this)closeDialog()">
+  <div class="dialog">
+    <div class="dialog-hdr">
+      <span>COPY SETTING TO URL</span>
+      <div style="font-size:9px;color:var(--muted);letter-spacing:1px" id="dlgUrl"></div>
+      <button class="close-btn" onclick="closeDialog()">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div style="font-size:9px;color:var(--label)">HTTP POST · Content-Type: application/json</div>
+      <div class="dialog-tabs">
+        <button class="dtab active" onclick="showTab('json',this)">JSON</button>
+        <button class="dtab" onclick="showTab('curl',this)">cURL</button>
+        <button class="dtab" onclick="showTab('python',this)">Python</button>
+        <button class="dtab" onclick="showTab('js',this)">JS fetch</button>
+        <button class="dtab" onclick="showTab('urlparams',this)">URL params</button>
+      </div>
+      <div class="dialog-code" id="dlgCode"></div>
+      <div style="font-size:9px;color:var(--muted);line-height:1.7" id="dlgStatus"></div>
+    </div>
+    <div class="dialog-footer">
+      <span class="copy-ok" id="copyOk">✓ copied</span>
+      <button class="btn" onclick="copyDlg()">Copy</button>
+      <button class="btn" style="border-color:#4a90d9;color:#4a90d9" onclick="openUrlParams()">Open URL+params</button>
+      <button class="btn" style="border-color:var(--accent2);color:var(--accent2)" onclick="doPost()">POST Now</button>
+      <button class="btn" onclick="closeDialog()">Close</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
